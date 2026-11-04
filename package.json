@@ -1,0 +1,36 @@
+{
+  "name": "png-alert",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PNG Alert: community-powered local information with a moderated, sourced public feed.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build && npm run check:secrets"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.46.1",
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.14",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.1.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
