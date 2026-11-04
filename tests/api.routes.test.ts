@@ -34,7 +34,7 @@ function post(path: string, fields: Record<string, string>, o: { origin?: string
   if (origin) headers.origin = origin;
   return new NextRequest(`http://app.test${path}`, { method: "POST", headers, body: o.body ?? new URLSearchParams(fields).toString() });
 }
-const ctx = (p: Record<string, string>) => ({ params: Promise.resolve(p) });
+const ctx = <T extends Record<string, string>>(p: T) => ({ params: Promise.resolve(p) });
 
 type Case = { name: string; path: string; fields: Record<string, string>; role: string; call: (r: NextRequest) => Promise<Response> };
 const CASES: Case[] = [
