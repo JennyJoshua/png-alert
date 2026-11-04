@@ -23,3 +23,28 @@ export function guard(req: NextRequest, limiter?: RateLimiter, key = "") {
 export function safeNext(next: string | undefined | null, fallback = "/"): string {
   return next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : fallback;
 }
+
+export const MAX_FORM_BYTES = 64 * 1024;
+const FORM_TYPES = /^(application\/x-www-form-urlencoded|multipart\/form-data)/i;
+
+/** Reads a form body with a hard size cap and content-type check. Returns null for oversized, wrong-type or malformed bodies. */
+export async function readForm(req: NextRequest): Promise<FormData | null> {
+  const type = req.headers.get("content-type") ?? "";
+  if (!FORM_TYPES.test(type)) return null;
+  const declared = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > MAX_FORM_BYTES) return null;
+  const reader = req.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_FORM_BYTES) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  try { return await new Response(new Blob(chunks as BlobPart[]), { headers: { "content-type": type } }).formData(); } catch { return null; }
+}
+
+export const badForm = () => new NextResponse("Invalid or oversized form.", { status: 400 });

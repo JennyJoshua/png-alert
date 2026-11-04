@@ -3,7 +3,7 @@ import { isConfigured } from "@/lib/env";
 import { currentViewer, isAdmin } from "@/lib/auth";
 import { serviceClient } from "@/lib/supabase";
 import { firstError, formToObject, registrySchema } from "@/lib/validation";
-import { guard, redirectTo } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo } from "@/lib/http";
 import { userMessage } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
@@ -13,7 +13,9 @@ export async function POST(req: NextRequest) {
   const viewer = await currentViewer();
   if (!isAdmin(viewer)) return new Response("Forbidden", { status: 403 });
 
-  const parsed = registrySchema.safeParse(formToObject(await req.formData()));
+  const form = await readForm(req);
+  if (!form) return badForm();
+  const parsed = registrySchema.safeParse(formToObject(form));
   if (!parsed.success) return redirectTo(req, "/admin/sources", { error: firstError(parsed.error) });
   const d = parsed.data;
   // No automatic importer ships in this MVP, so ingestion stays manual and disabled. A feed URL is recorded only as a note.

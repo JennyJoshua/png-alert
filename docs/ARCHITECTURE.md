@@ -29,7 +29,8 @@ All state changes go through functions in `supabase/migrations/0001_init.sql`: `
 `lib/safety.ts` flags violence, conflict, accusation and political wording. Flags never auto-publish or auto-reject; a moderator must write a reason to approve a flagged item. Phone numbers and emails are rejected at validation. Crime, tribal conflict and political violence are outside published scope (community rules).
 
 ## Known limitations and decisions
-- Rate limiting in route handlers is per instance (in memory). The database enforces per-account hourly caps globally. IP-level limiting across instances needs a shared store.
+- **Pilot limitation: the IP rate limiter is per instance.** `lib/rate-limit.ts` keeps counters in process memory, so each server instance counts separately and counters reset on restart. It slows casual abuse only. Per-account hourly caps are enforced in the database and apply across all instances (`submit_incident` 10/hour, `submit_source_item` 10/hour, `cast_confirmation` 30/hour). No paid or shared rate-limit service is used; adding one is a later decision for the owner.
+- Form bodies are capped at 64 KB and must be form-encoded; anything else gets a 400 before parsing.
 - Duplicate detection is exact (category + province + locality + normalised title, 24 h). It surfaces candidates to moderators; it does not auto-merge. Coordinated confirmation rings are not detected.
 - Form dates are interpreted as PNG time (UTC+10).
 - Locations are free text with a fixed province list; the `locations` table is for later admin-managed districts and localities.

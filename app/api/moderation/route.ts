@@ -4,7 +4,7 @@ import { currentViewer, isModerator } from "@/lib/auth";
 import { serviceClient } from "@/lib/supabase";
 import { firstError, formToObject, moderationSchema } from "@/lib/validation";
 import { pngLocalToIso } from "@/lib/time";
-import { guard, redirectTo } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo } from "@/lib/http";
 import { userMessage } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
@@ -15,7 +15,9 @@ export async function POST(req: NextRequest) {
   if (!viewer) return redirectTo(req, "/login", { error: "Log in as a moderator.", next: "/moderation" });
   if (!isModerator(viewer)) return new Response("Forbidden", { status: 403 });
 
-  const parsed = moderationSchema.safeParse(formToObject(await req.formData()));
+  const form = await readForm(req);
+  if (!form) return badForm();
+  const parsed = moderationSchema.safeParse(formToObject(form));
   if (!parsed.success) return redirectTo(req, "/moderation", { error: firstError(parsed.error) });
   const d = parsed.data;
 

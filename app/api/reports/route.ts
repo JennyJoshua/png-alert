@@ -5,7 +5,7 @@ import { serviceClient } from "@/lib/supabase";
 import { firstError, formToObject, reportSchema } from "@/lib/validation";
 import { riskFlags } from "@/lib/safety";
 import { pngLocalToIso } from "@/lib/time";
-import { guard, redirectTo } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo } from "@/lib/http";
 import { RateLimiter } from "@/lib/rate-limit";
 import { userMessage } from "@/lib/errors";
 
@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
   const viewer = await currentViewer();
   if (!viewer && !serverEnv().allowAnonymousReports) return redirectTo(req, "/login", { error: "Log in to submit a report.", next: "/report" });
 
-  const parsed = reportSchema.safeParse(formToObject(await req.formData()));
+  const form = await readForm(req);
+  if (!form) return badForm();
+  const parsed = reportSchema.safeParse(formToObject(form));
   if (!parsed.success) return redirectTo(req, "/report", { error: firstError(parsed.error) });
   const d = parsed.data;
   const { error } = await serviceClient().rpc("submit_incident", {

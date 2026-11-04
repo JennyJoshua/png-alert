@@ -6,7 +6,7 @@ import { firstError, formToObject, sourceSchema } from "@/lib/validation";
 import { riskFlags } from "@/lib/safety";
 import { canonicalizeUrl } from "@/lib/url";
 import { pngLocalToIso } from "@/lib/time";
-import { guard, redirectTo } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo } from "@/lib/http";
 import { RateLimiter } from "@/lib/rate-limit";
 import { userMessage } from "@/lib/errors";
 
@@ -19,7 +19,9 @@ export async function POST(req: NextRequest) {
   const viewer = await currentViewer();
   if (!viewer && !serverEnv().allowAnonymousReports) return redirectTo(req, "/login", { error: "Log in to submit a link.", next: "/submit-source" });
 
-  const parsed = sourceSchema.safeParse(formToObject(await req.formData()));
+  const form = await readForm(req);
+  if (!form) return badForm();
+  const parsed = sourceSchema.safeParse(formToObject(form));
   if (!parsed.success) return redirectTo(req, "/submit-source", { error: firstError(parsed.error) });
   const d = parsed.data;
   // The link is stored as given. PNG Alert never fetches or scrapes the page.

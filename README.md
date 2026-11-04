@@ -16,6 +16,11 @@ First implementation (MVP), submitted as a pull request for review. Nothing here
 - Manual link submission (Facebook, news, official notices) with moderator-written short summaries. PNG Alert never fetches or copies third-party pages.
 - Admin source registry. Automatic importing is **not** built (see `docs/SOURCE_AUDIT.md`).
 
+## Pilot limitations
+
+- The IP rate limiter in the route handlers is per instance (in memory) and resets on restart. Database per-account limits are the dependable control. No shared or paid rate-limit service is used.
+- Anonymous reporting is **disabled by default** (`ALLOW_ANONYMOUS_REPORTS=false`); anonymous visitors can still read the feed and flag items.
+
 ## Not included yet
 
 Photo upload (table exists, no UI or storage bucket), automatic RSS/feed import, push notifications, SMS, maps, multilingual UI, PWA icons, a moderator-management UI (promote moderators with SQL, below), formal accessibility and legal review.
@@ -45,7 +50,8 @@ Moderators are `role = 'moderator'`.
 ## Checks
 
 ```bash
-npm run check      # lint, typecheck, tests, build, secret scan
+npm ci             # clean install from package-lock.json
+npm run check      # lint, typecheck, tests, build, then the secret scan over the built output
 ```
 
 Tests include database tests that apply the real migration to an in-process Postgres (PGlite) with a small shim for the Supabase `auth` schema and roles. They exercise the workflow and RLS/permission rules. They do not exercise Supabase Auth, PostgREST or the Next.js routes against a live project.

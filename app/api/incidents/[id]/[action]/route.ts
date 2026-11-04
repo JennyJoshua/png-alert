@@ -4,7 +4,7 @@ import { isConfigured } from "@/lib/env";
 import { currentViewer } from "@/lib/auth";
 import { serviceClient } from "@/lib/supabase";
 import { firstError, flagSchema, formToObject, voteSchema } from "@/lib/validation";
-import { guard, redirectTo } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo } from "@/lib/http";
 import { RateLimiter } from "@/lib/rate-limit";
 import { userMessage } from "@/lib/errors";
 
@@ -18,7 +18,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!z.string().uuid().safeParse(id).success || !["vote", "flag"].includes(action)) return redirectTo(req, "/", { error: "That item is not available." });
   if (!isConfigured()) return redirectTo(req, page, { error: "This site is not connected to its database yet." });
 
-  const form = formToObject(await req.formData());
+  const raw = await readForm(req);
+  if (!raw) return badForm();
+  const form = formToObject(raw);
   const viewer = await currentViewer();
   const db = serviceClient();
 

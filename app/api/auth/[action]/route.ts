@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isConfigured } from "@/lib/env";
 import { sessionClient } from "@/lib/supabase";
 import { formToObject } from "@/lib/validation";
-import { guard, redirectTo, safeNext } from "@/lib/http";
+import { badForm, guard, readForm, redirectTo, safeNext } from "@/lib/http";
 import { RateLimiter } from "@/lib/rate-limit";
 
 const limiter = new RateLimiter(10, 10 * 60_000);
@@ -19,7 +19,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
   if (action === "logout") { await sb.auth.signOut(); return redirectTo(req, "/"); }
   if (action !== "login" && action !== "signup") return redirectTo(req, "/login", { error: "Unknown action." });
 
-  const form = formToObject(await req.formData());
+  const raw = await readForm(req);
+  if (!raw) return badForm();
+  const form = formToObject(raw);
   const next = safeNext(form.next);
   const p = credentials.safeParse(form);
   if (!p.success) return redirectTo(req, "/login", { error: p.error.issues[0].message, next });

@@ -18,4 +18,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm run check:secrets
+      # Must run after the build: it inspects .next/static and fails if the build output is missing.
+      - run: npm run check:secrets:built
