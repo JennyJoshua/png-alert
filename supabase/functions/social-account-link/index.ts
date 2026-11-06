@@ -106,6 +106,10 @@ function appReturnUrl(status: string, provider?: string): Response {
 
 function providerCredentials(provider: Provider) {
   const prefix = provider.toUpperCase();
+  // A provider stays disabled unless an owner explicitly enables its server-side flag.
+  if (Deno.env.get(`${prefix}_LINKING_ENABLED`) !== "true") {
+    throw new Error("PROVIDER_NOT_CONFIGURED");
+  }
   const clientId = Deno.env.get(`${prefix}_CLIENT_ID`);
   const clientSecret = Deno.env.get(`${prefix}_CLIENT_SECRET`);
   if (!clientId || !clientSecret) throw new Error("PROVIDER_NOT_CONFIGURED");
@@ -270,8 +274,9 @@ async function fetchIdentity(
     const version = Deno.env.get("FACEBOOK_GRAPH_VERSION") ?? "v26.0";
     const url = new URL(`https://graph.facebook.com/${version}/me`);
     url.searchParams.set("fields", "id,name,picture.type(large)");
-    url.searchParams.set("access_token", token.accessToken);
-    const profile = await fetchJson(url.toString());
+    const profile = await fetchJson(url.toString(), {
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    });
     if (typeof profile.id !== "string") throw new Error("PROVIDER_PROFILE_INVALID");
     const picture = profile.picture as { data?: { url?: string } } | undefined;
     return {
@@ -396,6 +401,11 @@ async function authenticatedAction(req: Request, action: string): Promise<Respon
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    const origin = req.headers.get("Origin");
+    const allowedOrigin = Deno.env.get("SOCIAL_LINK_APP_ORIGIN");
+    if (origin && allowedOrigin && origin !== allowedOrigin) {
+      return json({ error: "Origin not allowed." }, 403);
+    }
     const url = new URL(req.url);
     const action = url.searchParams.get("action") ?? "";
     if (action === "callback" && req.method === "GET") return await handleCallback(req);
