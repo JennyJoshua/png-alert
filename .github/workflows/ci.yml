@@ -20,15 +20,3 @@ jobs:
       - run: npm run build
       # Must run after the build: it inspects .next/static and fails if the build output is missing.
       - run: npm run check:secrets:built
-      # Downloadable test build: a self-contained Node.js server (not an Android APK). Packaging fails if the
-      # output contains env files or secret-looking values, and the package is smoke-tested from a clean directory.
-      - name: Package standalone test build
-        run: bash scripts/package-test-build.sh dist/png-alert-test-build
-      - name: Upload test build
-        uses: actions/upload-artifact@v4
-        with:
-          name: png-alert-test-build
-          path: dist/png-alert-test-build
-          include-hidden-files: true # .next/ is a hidden directory and is required at runtime
-          if-no-files-found: error
-          retention-days: 14
