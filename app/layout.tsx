@@ -24,6 +24,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/submit-source">Share a link</Link>
               {isModerator(viewer) && <Link href="/moderation">Moderation</Link>}
               {isAdmin(viewer) && <Link href="/admin/sources">Sources</Link>}
+              {viewer && <Link href="/settings">Account settings</Link>}
               {viewer ? <form method="post" action="/api/auth/logout"><button type="submit">Log out</button></form> : <Link href="/login">Log in</Link>}
             </nav>
           </div>
