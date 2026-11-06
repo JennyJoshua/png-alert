@@ -74,7 +74,7 @@ The callback URL is the function's base path with no query string. It must match
 
 ### X
 - Uses OAuth 2.0 Authorization Code with PKCE and requests only `users.read`.
-- **Keep X disabled until the owner explicitly approves a usage budget.** X currently uses consumption-based API billing; the authenticated user lookup endpoint is a billable API read. No X request is made by this repository change, and no credits or payment method have been added.
+- **Keep X disabled until the owner explicitly approves a usage budget.** X currently uses consumption-based API billing; its published price for a user read is USD $0.010 per resource. The authenticated user lookup is therefore billable. No X request is made by this repository change, and no credits or payment method have been added.
 
 ## Migration and rollout
 
