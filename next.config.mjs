@@ -6,7 +6,6 @@ const csp = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
-  output: "standalone", // self-contained Node.js server for the downloadable test build
   async headers() {
     const base = [
       { key: "X-Content-Type-Options", value: "nosniff" },
