@@ -11,7 +11,7 @@ const providerSchema = z.enum(["facebook", "linkedin", "x"]);
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ action: string }> }) {
   const { action } = await ctx.params;
-  const blocked = guard(req, limiter, \`social-\${action}\`);
+  const blocked = guard(req, limiter, "social-" + action);
   if (blocked) return blocked;
   if (!["start", "disconnect"].includes(action)) {
     return redirectTo(req, "/settings", { social_link: "failed" });
@@ -36,13 +36,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
   }
 
   const env = serverEnv();
-  const endpoint = \`\${env.url!.replace(/\/$/, "")}/functions/v1/social-account-link?action=\${action}\`;
+  const endpoint = env.url!.replace(/\/$/, "") + "/functions/v1/social-account-link?action=" + action;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "apikey": env.anon!,
-      "Authorization": \`Bearer \${sessionData.session.access_token}\`,
+      "Authorization": "Bearer " + sessionData.session.access_token,
     },
     body: JSON.stringify({ provider }),
     cache: "no-store",
