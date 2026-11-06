@@ -46,7 +46,7 @@ Set these only after the owner completes provider app registration and approves 
 
 - `SOCIAL_OAUTH_ENCRYPTION_KEY`: base64-encoded 32-byte random key.
 - `SOCIAL_LINK_RETURN_URL`: exact PNG Alert frontend page to receive the callback status.
-- `SOCIAL_LINK_APP_ORIGIN`: exact frontend origin, including scheme and port if applicable.
+- `SOCIAL_LINK_APP_ORIGIN`: exact frontend origin, including scheme and port if applicable. Browser access is not enabled until this is set.
 - `FACEBOOK_LINKING_ENABLED=true`, `FACEBOOK_CLIENT_ID`, `FACEBOOK_CLIENT_SECRET`.
 - `LINKEDIN_LINKING_ENABLED=true`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`.
 - `X_LINKING_ENABLED=true`, `X_CLIENT_ID`, `X_CLIENT_SECRET`.
