@@ -17,7 +17,7 @@ All routes use the Supabase Edge Function URL:
 | Action | Method | Authentication | Purpose |
 |---|---|---|---|
 | `?action=start` | POST | Supabase user JWT | Create a short-lived attempt and return the provider authorization URL |
-| `?action=callback` | GET | One-time OAuth state | Exchange code, validate provider identity, and save metadata |
+| `/social-account-link` (no query string) | GET | One-time OAuth state | Exchange code, validate provider identity, and save metadata |
 | `?action=list` | POST | Supabase user JWT | List the current user's linked identities |
 | `?action=disconnect` | POST | Supabase user JWT | Disconnect the current user's identity for one provider |
 
@@ -56,9 +56,9 @@ All three provider enable flags are deliberately absent/false by default. Creden
 
 Register this exact callback URL with each provider app:
 
-`https://<project-ref>.supabase.co/functions/v1/social-account-link?action=callback`
+`https://<project-ref>.supabase.co/functions/v1/social-account-link`
 
-The callback URL must match exactly in the provider console and the server-generated request.
+The callback URL is the function's base path with no query string. It must match exactly in the provider console and the server-generated request. Start/list/disconnect use POST requests with the corresponding `?action=` query parameter.
 
 ## Provider-specific activation constraints
 
@@ -90,4 +90,4 @@ The Edge Function has been committed to this branch but has **not** been deploye
 4. Deploy the Edge Function only after the owner explicitly authorizes deployment.
 5. Complete provider test-account flows and test state replay, expiry, user ownership, identity conflicts, disconnect, and token non-persistence.
 6. Build the frontend settings UI and connect it to these endpoints.
-7. Add automated Deno tests and CI checks before production activation.
+7. Run `deno test --allow-env=SOCIAL_OAUTH_ENCRYPTION_KEY supabase/functions/_shared/social-oauth-crypto_test.ts` and add CI checks before production activation.
