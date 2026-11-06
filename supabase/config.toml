@@ -1,4 +1,4 @@
-project_id = "png-alert"
+project_id = "lmzjkrvnnarrqplsyiqb"
 
 # The callback must be reachable without a Supabase JWT. The function validates
 # the user's Supabase JWT manually for start/list/disconnect actions; callback
