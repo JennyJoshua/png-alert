@@ -24,7 +24,9 @@ Deno.test("PKCE verifier encryption round-trips and rejects tampering", async ()
     const verifier = "test-pkce-verifier-with-sufficient-entropy";
     const encrypted = await encryptVerifier(verifier);
     assertEquals(await decryptVerifier(encrypted), verifier);
-    const tampered = encrypted.slice(0, -1) + (encrypted.endsWith("A") ? "B" : "A");
+    const [version, iv, ciphertext] = encrypted.split(".");
+    const changedCiphertext = (ciphertext[0] === "A" ? "B" : "A") + ciphertext.slice(1);
+    const tampered = `${version}.${iv}.${changedCiphertext}`;
     assertNotEquals(tampered, encrypted);
     await assertRejects(() => decryptVerifier(tampered));
   } finally {
