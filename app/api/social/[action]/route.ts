@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
   }
 
   const env = serverEnv();
-  const endpoint = `${env.url!.replace(/\/$/, "")}/functions/v1/social-account-link?action=${action}`;
+  const endpoint = `${env.url!.replace(/\\/$/, "")}/functions/v1/social-account-link?action=${action}`;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -56,8 +56,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
     });
   }
 
+  const payload = await response.json().catch(() => null);
   if (action === "start") {
-    const payload = await response.json().catch(() => null);
     const authorizationUrl = payload?.authorization_url;
     if (typeof authorizationUrl !== "string") {
       return redirectTo(req, "/settings", { social_link: "failed", provider });
@@ -76,5 +76,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
     }
   }
 
+  if (payload?.disconnected !== true) {
+    return redirectTo(req, "/settings", { social_link: "failed", provider });
+  }
   return redirectTo(req, "/settings", { social_link: "disconnected", provider });
 }
