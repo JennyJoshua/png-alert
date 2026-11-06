@@ -1,6 +1,6 @@
 # PNG Alert Phase 2 — Social Identity Linking
 
-**Status:** Foundation implemented; OAuth provider integrations not yet enabled.  
+**Status:** Database foundation implemented; first-wave OAuth backend proposed in [PR #5](https://github.com/JennyJoshua/png-alert/pull/5), not deployed or activated.  
 **Approved decisions:** first wave Facebook, LinkedIn and X; do not retain provider access/refresh tokens; one active external account per provider per PNG Alert user; keep social connections separate from Supabase login identities; feature branch and draft PR only.
 
 ## Objective
@@ -22,7 +22,9 @@ The migration:
 - Enforces one active external identity globally and one active connection per provider per PNG Alert user.
 - Does not store provider access tokens, refresh tokens, client secrets or authorization codes.
 
-## Required server-side behavior (not yet implemented)
+## Required server-side behavior
+
+The first-wave server implementation is documented in [phase-2-first-wave-oauth.md](./phase-2-first-wave-oauth.md). Its migration and Edge Function remain un-applied/undeployed until separately authorized.
 
 1. Require a valid PNG Alert user session before creating an OAuth attempt.
 2. Generate cryptographically random OAuth state and PKCE values; store only a SHA-256 state hash and encrypted PKCE verifier ciphertext.
