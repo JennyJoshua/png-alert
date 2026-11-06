@@ -1,5 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.89.0";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@6.1.0";
+import {
+  base64url,
+  decryptVerifier,
+  encryptVerifier,
+  sha256Hex,
+} from "../_shared/social-oauth-crypto.ts";
 
 type Provider = "facebook" | "linkedin" | "x";
 type Attempt = {
@@ -12,8 +18,6 @@ type Attempt = {
   callback_uri: string;
 };
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("SOCIAL_LINK_APP_ORIGIN") ?? "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
@@ -26,49 +30,6 @@ function json(data: unknown, status = 200): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
   });
-}
-
-function base64url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
-}
-
-function fromBase64(value: string): Uint8Array {
-  const binary = atob(value);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function encryptVerifier(verifier: string): Promise<string> {
-  const encodedKey = Deno.env.get("SOCIAL_OAUTH_ENCRYPTION_KEY");
-  if (!encodedKey) throw new Error("SERVER_NOT_CONFIGURED");
-  const keyBytes = fromBase64(encodedKey);
-  if (keyBytes.length !== 32) throw new Error("SERVER_NOT_CONFIGURED");
-  const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(verifier));
-  return `v1.${base64url(iv)}.${base64url(new Uint8Array(encrypted))}`;
-}
-
-async function decryptVerifier(ciphertext: string): Promise<string> {
-  const [version, ivText, encryptedText] = ciphertext.split(".");
-  if (version !== "v1" || !ivText || !encryptedText) throw new Error("INVALID_OAUTH_ATTEMPT");
-  const encodedKey = Deno.env.get("SOCIAL_OAUTH_ENCRYPTION_KEY");
-  if (!encodedKey) throw new Error("SERVER_NOT_CONFIGURED");
-  const keyBytes = fromBase64(encodedKey);
-  if (keyBytes.length !== 32) throw new Error("SERVER_NOT_CONFIGURED");
-  const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["decrypt"]);
-  const plain = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: fromBase64(ivText) },
-    key,
-    fromBase64(encryptedText),
-  );
-  return decoder.decode(plain);
 }
 
 function serviceClient() {
@@ -190,8 +151,8 @@ async function startLink(req: Request): Promise<Response> {
 
   if (provider === "linkedin") authorize.searchParams.set("nonce", nonce!);
   if (provider === "x") {
-    const challenge = await crypto.subtle.digest("SHA-256", encoder.encode(verifier));
-    authorize.searchParams.set("code_challenge", base64url(new Uint8Array(challenge)));
+    const challengeDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+    authorize.searchParams.set("code_challenge", base64url(new Uint8Array(challengeDigest)));
     authorize.searchParams.set("code_challenge_method", "S256");
   }
 
