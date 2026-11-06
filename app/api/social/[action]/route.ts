@@ -4,9 +4,10 @@ import { isConfigured, serverEnv } from "@/lib/env";
 import { sessionClient } from "@/lib/supabase";
 import { guard, readForm, redirectTo } from "@/lib/http";
 import { RateLimiter } from "@/lib/rate-limit";
+import { z } from "zod";
 
 const limiter = new RateLimiter(8, 10 * 60_000);
-const providers = new Set(["facebook", "linkedin", "x"]);
+const providerSchema = z.enum(["facebook", "linkedin", "x"]);
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ action: string }> }) {
   const { action } = await ctx.params;
@@ -21,8 +22,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ action: st
 
   const form = await readForm(req);
   if (!form) return new NextResponse("Invalid form.", { status: 400 });
-  const provider = String(form.get("provider") ?? "").toLowerCase();
-  if (!providers.has(provider)) return redirectTo(req, "/settings", { social_link: "failed" });
+  const parsedProvider = providerSchema.safeParse(String(form.get("provider") ?? "").toLowerCase());
+  if (!parsedProvider.success) return redirectTo(req, "/settings", { social_link: "failed" });
+  const provider = parsedProvider.data;
 
   const supabase = await sessionClient();
   const [{ data: userData }, { data: sessionData }] = await Promise.all([
