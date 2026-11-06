@@ -10,7 +10,7 @@ Deno.test("SHA-256 produces the expected state digest", async () => {
 
 Deno.test("base64url encoding is URL-safe and unpadded", () => {
   const encoded = base64url(new Uint8Array([251, 255, 239]));
-  assertEquals(encoded, "-_8v");
+  assertEquals(encoded, "-__v");
   assertEquals(encoded.includes("="), false);
 });
 
