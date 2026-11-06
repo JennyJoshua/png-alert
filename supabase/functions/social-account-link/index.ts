@@ -53,7 +53,7 @@ function serviceClient() {
 function callbackUri(): string {
   const base = Deno.env.get("SUPABASE_URL");
   if (!base) throw new Error("SERVER_NOT_CONFIGURED");
-  return `${base.replace(/\/$/, "")}/functions/v1/social-account-link?action=callback`;
+  return `${base.replace(/\/$/, "")}/functions/v1/social-account-link`;
 }
 
 function appReturnUrl(status: string, provider?: string): Response {
@@ -369,7 +369,7 @@ Deno.serve(async (req: Request) => {
     }
     const url = new URL(req.url);
     const action = url.searchParams.get("action") ?? "";
-    if (action === "callback" && req.method === "GET") return await handleCallback(req);
+    if (req.method === "GET") return await handleCallback(req);
     if (action === "start" && req.method === "POST") return await startLink(req);
     if ((action === "list" || action === "disconnect") && req.method === "POST") {
       return await authenticatedAction(req, action);
