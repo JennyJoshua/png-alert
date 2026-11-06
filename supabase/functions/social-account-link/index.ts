@@ -60,9 +60,19 @@ function appReturnUrl(status: string, provider?: string): Response {
   const configured = Deno.env.get("SOCIAL_LINK_RETURN_URL");
   if (!configured) return json({ error: "Social linking return URL is not configured." }, 503);
   const target = new URL(configured);
+  if (target.protocol !== "https:" && target.hostname !== "localhost") {
+    return json({ error: "Social linking return URL must use HTTPS." }, 503);
+  }
   target.searchParams.set("social_link", status);
   if (provider) target.searchParams.set("provider", provider);
-  return Response.redirect(target.toString(), 303);
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: target.toString(),
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
 }
 
 function providerCredentials(provider: Provider) {
