@@ -6,7 +6,7 @@
 
 This slice adds server-side account linking for Facebook, LinkedIn (OIDC), and X. It links an external identity to an already-authenticated PNG Alert user. It does not replace Supabase login, verify legal identity, publish content, or retain provider access/refresh tokens.
 
-The repository currently has no application frontend. This is therefore a backend API foundation; the UI must later call these endpoints and handle the callback result.
+The repository already has a Next.js web frontend implementation on `feat/png-alert-mvp` / [PR #1](https://github.com/JennyJoshua/png-alert/pull/1), whose standalone build artifact was generated earlier. PR #1 remains open and unmerged, so that source is not yet in `main`. A separate native Android frontend exists on `feat/png-alert-android`, also outside `main`. This PR adds backend support only; the remaining frontend task is to add social-account connection/settings screens to the existing Next.js app and wire them to these endpoints.
 
 ## Endpoints
 
