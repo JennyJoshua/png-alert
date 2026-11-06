@@ -19,7 +19,7 @@ type Attempt = {
 };
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("SOCIAL_LINK_APP_ORIGIN") ?? "*",
+  "Access-Control-Allow-Origin": Deno.env.get("SOCIAL_LINK_APP_ORIGIN") ?? "null",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Vary": "Origin",
@@ -112,7 +112,7 @@ async function startLink(req: Request): Promise<Response> {
   if (!["facebook", "linkedin", "x"].includes(provider)) {
     return json({ error: "Unsupported provider." }, 400);
   }
-  if (!Deno.env.get("SOCIAL_LINK_RETURN_URL")) {
+  if (!Deno.env.get("SOCIAL_LINK_RETURN_URL") || !Deno.env.get("SOCIAL_LINK_APP_ORIGIN")) {
     return json({ error: "Social linking is not configured for this application yet." }, 503);
   }
 
