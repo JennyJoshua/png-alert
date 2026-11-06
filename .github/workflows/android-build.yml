@@ -1,0 +1,102 @@
+name: Android build and test
+
+# Builds the native Android app in android/: compile, unit tests, debug APK. No secrets, read-only token.
+# Same pinned actions as the TenderReady build. The Gradle wrapper jar is a binary file, so this workflow
+# installs Gradle 8.9 with the pinned setup-gradle action instead of using ./gradlew.
+# Do NOT change the pull_request trigger to pull_request_target.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/png-alert-android]
+    paths: ["android/**", ".github/workflows/android-build.yml"]
+  pull_request:
+    paths: ["android/**", ".github/workflows/android-build.yml"]
+
+concurrency:
+  group: android-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test, package debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: android
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: ''
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+        with:
+          gradle-version: "8.9"
+
+      - name: Compile
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ci-logs"
+          gradle :app:compileDebugSources --stacktrace --console=plain --no-daemon 2>&1 | tee "$GITHUB_WORKSPACE/ci-logs/compile.log"
+
+      - name: Unit tests
+        run: |
+          gradle :app:testDebugUnitTest --stacktrace --console=plain --no-daemon 2>&1 | tee "$GITHUB_WORKSPACE/ci-logs/unit-tests.log"
+
+      - name: Build debug APK
+        id: apk
+        run: |
+          gradle :app:assembleDebug --stacktrace --console=plain --no-daemon 2>&1 | tee "$GITHUB_WORKSPACE/ci-logs/apk.log"
+          if ! compgen -G "app/build/outputs/apk/debug/*.apk" > /dev/null; then
+            echo "::error title=No APK produced::Gradle finished but no .apk exists in android/app/build/outputs/apk/debug."
+            exit 1
+          fi
+          ls -l app/build/outputs/apk/debug/*.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: png-alert-android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Surface build errors
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for f in "$GITHUB_WORKSPACE"/ci-logs/*.log; do
+            echo "### $(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
+            grep -E '^e: |error:|What went wrong|Execution failed|FAILED|AssertionError|Unresolved reference' "$f" | head -40 | tee -a "$GITHUB_STEP_SUMMARY" | while IFS= read -r line; do
+              line="${line//'%'/'%25'}"
+              echo "::error::${line:0:400}"
+            done
+          done
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: png-alert-android-diagnostics
+          path: |
+            ci-logs/**
+            android/app/build/reports/**
+            android/app/build/test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
