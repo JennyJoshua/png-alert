@@ -9,7 +9,7 @@ Allow an already-authenticated PNG Alert user to prove control of an external so
 
 ## Implemented database foundation
 
-Migration `20261106070000_png_alert_social_identity_linking_phase2_foundation.sql` creates three tables in the non-public `private` schema:
+Migration `20261106065251_png_alert_social_identity_linking_phase2_foundation.sql` creates three tables in the non-public `private` schema:
 
 - `private.social_account_connections`: provider identity, owning PNG Alert user, profile metadata, scopes, status and timestamps.
 - `private.social_oauth_attempts`: short-lived OAuth transaction state, nonce hash, encrypted PKCE verifier ciphertext, requested scopes, callback URI, expiry and one-time consumption status.
