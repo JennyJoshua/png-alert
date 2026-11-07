@@ -39,6 +39,8 @@ export async function getIncident(id: string) {
     db.from("public_incident_sources").select("*").eq("incident_id", id),
     db.from("public_incident_history").select("*").eq("incident_id", id).order("created_at", { ascending: true }),
   ]);
+  if (sources.error) throw sources.error;
+  if (history.error) throw history.error;
   return { incident, sources: sources.data ?? [], history: history.data ?? [] };
 }
 
@@ -52,10 +54,13 @@ export async function moderationData() {
     db.from("content_flags").select("id,target_type,target_id,reason,created_at").eq("resolved", false).order("created_at", { ascending: true }).limit(30),
     db.from("moderation_actions").select("action,target_type,target_id,reason,created_at").order("created_at", { ascending: false }).limit(10),
   ]);
+  const failed = [reports, sources, active, registry, flags, audit].find((result) => result.error);
+  if (failed?.error) throw failed.error;
   return { reports: reports.data ?? [], sources: sources.data ?? [], active: active.data ?? [], registry: registry.data ?? [], flags: flags.data ?? [], audit: audit.data ?? [] };
 }
 
 export async function listRegistry() {
-  const { data } = await serviceClient().from("source_registry").select("*").order("name");
+  const { data, error } = await serviceClient().from("source_registry").select("*").order("name");
+  if (error) throw error;
   return data ?? [];
 }
