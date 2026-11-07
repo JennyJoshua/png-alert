@@ -8,10 +8,10 @@ language sql
 immutable
 parallel safe
 set search_path = public
-as $$
+as $
   select coalesce(p_text, '') ~* '[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+'
       or coalesce(p_text, '') ~ '(^|[^0-9])([+]?[0-9][[:space:]().-]?){8,}([^0-9]|$)';
-$;
+$$;
 
 revoke all on function public.contains_contact_info(text) from public, anon, authenticated;
 grant execute on function public.contains_contact_info(text) to service_role;
@@ -34,7 +34,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 begin
   -- Serialize each bucket while counting and inserting so concurrent requests cannot
   -- race past the limit. Anonymous flags share a global bucket; no IP is persisted.
@@ -59,4 +59,4 @@ begin
 
   insert into content_flags (target_type, target_id, reason, flagged_by)
   values (p_type, p_target, p_reason, p_user);
-end $;
+end $$;
