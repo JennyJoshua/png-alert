@@ -1,15 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("server-only", () => ({}));
 const state = vi.hoisted(() => ({
-  configured: true, anonymous: false, viewer: null as null | { id: string; role: string },
+  anonymous: false, viewer: null as null | { id: string; role: string },
   rpc: [] as { fn: string; args: any }[], signedIn: 0,
-}));
-vi.mock("@/lib/env", () => ({
-  isConfigured: () => state.configured,
-  serverEnv: () => ({ allowAnonymousReports: state.anonymous }),
-  canonicalPublicOrigin: (requestOrigin?: string) => requestOrigin ?? null,
 }));
 vi.mock("@/lib/auth", () => ({
   currentViewer: async () => state.viewer,
@@ -51,7 +46,15 @@ const CASES: Case[] = [
   { name: "incidents/flag", path: `/api/incidents/${UUID}/flag`, fields: { reason: "This looks wrong to me" }, role: "reporter", call: (r) => incidentAction(r, ctx({ id: UUID, action: "flag" })) },
 ];
 
-beforeEach(() => { state.configured = true; state.anonymous = false; state.viewer = null; state.rpc = []; state.signedIn = 0; });
+beforeEach(() => {
+  vi.stubEnv("NODE_ENV", "test");
+  vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", "http://app.test");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example.test");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-key");
+  state.anonymous = false; state.viewer = null; state.rpc = []; state.signedIn = 0;
+});
+afterEach(() => vi.unstubAllEnvs());
 
 describe.each(CASES)("$name: request hardening applies to every mutating route", (c) => {
   beforeEach(() => { state.viewer = { id: "11111111-1111-4111-8111-111111111111", role: c.role }; });
@@ -78,22 +81,48 @@ describe.each(CASES)("$name: request hardening applies to every mutating route",
 });
 
 describe("canonical origin trust", () => {
-  it("ignores spoofed forwarded host and protocol when checking and redirecting", async () => {
+  it("uses the configured origin for CSRF checks and redirects despite spoofed forwarded headers", async () => {
+    vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", "https://alerts.example.org");
     state.viewer = { id: "11111111-1111-4111-8111-111111111111", role: "reporter" };
-    const req = new NextRequest("http://app.test/api/reports", {
+    const req = new NextRequest("https://alerts.example.org/api/reports", {
       method: "POST",
       headers: {
-        origin: "http://app.test",
+        origin: "https://alerts.example.org",
         "x-forwarded-host": "attacker.example",
-        "x-forwarded-proto": "https",
+        "x-forwarded-proto": "http",
         "content-type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(report).toString(),
     });
     const res = await reports(req);
     expect(res.status).toBe(303);
-    expect(new URL(res.headers.get("location")!).origin).toBe("http://app.test");
+    expect(new URL(res.headers.get("location")!).origin).toBe("https://alerts.example.org");
+    expect(state.rpc).toHaveLength(1);
   });
+
+  it.each([
+    ["host", "https://attacker.example"],
+    ["scheme", "https://app.test"],
+    ["port", "http://app.test:444"],
+  ])("rejects a mismatched Origin %s before touching the database", async (_kind, origin) => {
+    state.viewer = { id: "11111111-1111-4111-8111-111111111111", role: "reporter" };
+    const req = post("/api/reports", report, { origin });
+    const res = await reports(req);
+    expect(res.status).toBe(403);
+    expect(state.rpc).toHaveLength(0);
+  });
+
+  it.each(["", "not a URL", "http://alerts.example.org", "https://alerts.example.org/path"])(
+    "fails closed with HTTP 503 in production for missing or invalid origin configuration (%s)",
+    async (configuredOrigin) => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", configuredOrigin);
+      state.viewer = { id: "11111111-1111-4111-8111-111111111111", role: "reporter" };
+      const res = await reports(post("/api/reports", report));
+      expect(res.status).toBe(503);
+      expect(state.rpc).toHaveLength(0);
+    },
+  );
 });
 
 describe("authentication and authorisation", () => {
