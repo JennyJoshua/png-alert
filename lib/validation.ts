@@ -7,6 +7,7 @@ import { pngLocalToIso } from "./time";
 const blank = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const text = (min: number, max: number) => z.string().trim().min(min, `Use at least ${min} characters.`).max(max, `Use at most ${max} characters.`);
 const optText = (min: number, max: number) => z.preprocess(blank, text(min, max).optional());
+const publicText = (min: number, max: number) => optText(min, max).refine((v) => !v || !containsContactInfo(v), "Remove phone numbers and email addresses. PNG Alert never publishes contact details.");
 const urlField = z.preprocess(blank, z.string().trim().max(500).refine((v) => !!parseHttpUrl(v), "Enter a full link starting with http:// or https://").optional());
 const pngTime = z.preprocess(blank, z.string().refine((v) => pngLocalToIso(v) !== null, "Enter a valid date and time.").optional());
 const province = z.enum(PROVINCES, { errorMap: () => ({ message: "Choose a province." }) });
@@ -49,9 +50,9 @@ export const moderationSchema = z.object({
   target: z.enum(["incident", "source_item", "flag"]),
   id: uuid,
   action: z.string(),
-  reason: optText(5, 500),
-  title: optText(5, 200),
-  summary: optText(10, 2000),
+  reason: publicText(5, 500),
+  title: publicText(5, 200),
+  summary: publicText(10, 2000),
   valid_until: pngTime,
   merge_into: z.preprocess(blank, uuid.optional()),
   authority_name: optText(2, 120),
