@@ -66,6 +66,30 @@ describe("report -> moderation -> public feed", () => {
   });
 });
 
+describe("moderator-authored public text privacy", () => {
+  it("database constraints reject contact details in public incident and source text", async () => {
+    const reporter = await newUser(db);
+    const incident = await submit(db, reporter);
+    await expect(as(db, "service_role", () => db.query(
+      "update incidents set public_title = 'Call 71234567 for help' where id = $1", [incident]
+    ))).rejects.toThrow(/incidents_public_title_no_contact/);
+    await expect(as(db, "service_role", () => db.query(
+      "update incidents set public_summary = 'Email help@example.org for details' where id = $1", [incident]
+    ))).rejects.toThrow(/incidents_public_summary_no_contact/);
+
+    const source = (await as(db, "service_role", () => db.query<any>(
+      "select submit_source_item($1,'facebook','https://facebook.com/example/1','https://facebook.com/example/1','A source context with enough words','Western Highlands',null,'Mount Hagen',null,'{}')",
+      [reporter]
+    ))).rows[0].submit_source_item;
+    await expect(as(db, "service_role", () => db.query(
+      "update source_items set title = 'Call 71234567 now' where id = $1", [source]
+    ))).rejects.toThrow(/source_items_title_no_contact/);
+    await expect(as(db, "service_role", () => db.query(
+      "update source_items set summary = 'Email help@example.org for details' where id = $1", [source]
+    ))).rejects.toThrow(/source_items_summary_no_contact/);
+  });
+});
+
 describe("confirmation, staleness and trust labels", () => {
   async function published() {
     const reporter = await newUser(db), mod = await newUser(db, "moderator");
