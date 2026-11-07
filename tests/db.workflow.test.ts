@@ -150,6 +150,33 @@ describe("content flags", () => {
   });
 });
 
+describe("database flag limits", () => {
+  it("bounds anonymous flags globally and authenticated flags per account", async () => {
+    const reporter = await newUser(db), mod = await newUser(db, "moderator");
+    const id = await submit(db, reporter);
+    await moderate(db, mod, id, "approve");
+
+    for (let i = 0; i < 60; i++) {
+      await as(db, "service_role", () => db.query(
+        "select submit_flag(null,'incident',$1,$2)", [id, `Anonymous concern number ${i}`]
+      ));
+    }
+    await expect(as(db, "service_role", () => db.query(
+      "select submit_flag(null,'incident',$1,'Anonymous limit exceeded')", [id]
+    ))).rejects.toThrow(/rate_limited/);
+
+    const account = await newUser(db);
+    for (let i = 0; i < 10; i++) {
+      await as(db, "service_role", () => db.query(
+        "select submit_flag($1,'incident',$2,$3)", [account, id, `Account concern number ${i}`]
+      ));
+    }
+    await expect(as(db, "service_role", () => db.query(
+      "select submit_flag($1,'incident',$2,'Account limit exceeded')", [account, id]
+    ))).rejects.toThrow(/rate_limited/);
+  });
+});
+
 describe("abuse controls", () => {
   it("rejects an identical resubmission by the same account and rate-limits bursts", async () => {
     const u = await newUser(db);
