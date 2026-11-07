@@ -11,7 +11,10 @@ set search_path = public
 as $$
   select coalesce(p_text, '') ~* '[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+'
       or coalesce(p_text, '') ~ '(^|[^0-9])([+]?[0-9][[:space:]().-]?){8,}([^0-9]|$)';
-$$;
+$;
+
+revoke all on function public.contains_contact_info(text) from public, anon, authenticated;
+grant execute on function public.contains_contact_info(text) to service_role;
 
 alter table public.incidents
   add constraint incidents_public_title_no_contact
