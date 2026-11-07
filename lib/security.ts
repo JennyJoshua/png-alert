@@ -5,7 +5,7 @@ export function isSameOrigin(headers: Headers, expectedOrigin: string): boolean 
   try {
     const expected = new URL(expectedOrigin);
     const actual = new URL(origin);
-    return actual.origin === expected.origin;
+    return !actual.username && !actual.password && actual.origin === expected.origin;
   } catch {
     return false;
   }
