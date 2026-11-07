@@ -11,7 +11,12 @@ export default async function Sources({ searchParams }: { searchParams: Promise<
   const sp = await searchParams;
   if (!isConfigured()) return <><h1>Source registry</h1><NotConfigured /></>;
   if (!isAdmin(await currentViewer())) return <><h1>Source registry</h1><p className="flash error">This page is for administrators.</p></>;
-  const rows = await listRegistry();
+  let rows: Awaited<ReturnType<typeof listRegistry>>;
+  try {
+    rows = await listRegistry();
+  } catch {
+    return <><h1>Source registry</h1><p className="flash error" role="alert">The source registry is temporarily unavailable. Please try again later.</p></>;
+  }
   return (
     <>
       <h1>Source registry</h1>

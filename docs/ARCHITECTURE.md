@@ -19,7 +19,7 @@ All state changes go through functions in `supabase/migrations/0001_init.sql`: `
 - Function execute rights are revoked from public/anon/authenticated and granted to `service_role` only.
 - `moderation_actions` is append-only (trigger), even for privileged roles.
 - The service-role key is read only in `lib/env.ts` (`server-only`). `npm run check:secrets` fails if it, or `serviceClient`, appears in the browser bundle, or if keys/.env files are committed.
-- Route handlers require same-origin POSTs (CSRF), validate all input with zod, sanitise search terms, and map database errors to fixed user messages.
+- Route handlers require same-origin POSTs (CSRF), validate all input with zod, sanitise search terms, and map database errors to fixed user messages. The trust anchor is the configured `PNG_ALERT_PUBLIC_ORIGIN`; forwarded host/protocol headers are not trusted. In production, mutating routes return 503 until the owner supplies a valid HTTPS origin. Local development may use the request origin as a convenience.
 - Production responses carry CSP, X-Frame-Options, nosniff, Referrer-Policy and Permissions-Policy headers.
 
 ## Trust model
@@ -29,7 +29,9 @@ All state changes go through functions in `supabase/migrations/0001_init.sql`: `
 `lib/safety.ts` flags violence, conflict, accusation and political wording. Flags never auto-publish or auto-reject; a moderator must write a reason to approve a flagged item. Phone numbers and emails are rejected at validation. Crime, tribal conflict and political violence are outside published scope (community rules).
 
 ## Known limitations and decisions
+- Reader flag abuse is capped in Postgres: 10 flags per authenticated account per hour and 60 anonymous flags globally per hour. Anonymous flagging stays available without storing IP addresses. The anonymous cap is one deployment-wide shared bucket, not a per-user or per-IP limit. An attacker can consume all 60 anonymous slots and prevent legitimate anonymous readers from flagging until the one-hour window resets. This is an intentional pilot-stage privacy/abuse trade-off; monitor for exhaustion and revisit the model if abuse or traffic warrants it. No paid or external rate-limit service is used.
 - **Pilot limitation: the IP rate limiter is per instance.** `lib/rate-limit.ts` keeps counters in process memory, so each server instance counts separately and counters reset on restart. It slows casual abuse only. Per-account hourly caps are enforced in the database and apply across all instances (`submit_incident` 10/hour, `submit_source_item` 10/hour, `cast_confirmation` 30/hour). No paid or shared rate-limit service is used; adding one is a later decision for the owner.
+- Moderator-authored public titles and summaries are checked for contact details both in Zod validation and by database constraints added in `0002_security_hardening.sql`. The new migration is not applied automatically.
 - Form bodies are capped at 64 KB and must be form-encoded; anything else gets a 400 before parsing.
 - Duplicate detection is exact (category + province + locality + normalised title, 24 h). It surfaces candidates to moderators; it does not auto-merge. Coordinated confirmation rings are not detected.
 - Form dates are interpreted as PNG time (UTC+10).

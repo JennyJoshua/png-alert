@@ -42,6 +42,10 @@ describe("time", () => {
     expect(pngLocalToIso("2026-11-04T08:00")).toBe("2026-11-03T22:00:00.000Z");
     expect(pngLocalToIso("garbage")).toBeNull();
     expect(pngLocalToIso("")).toBeNull();
+    for (const invalid of ["2026-02-29T10:00", "2026-04-31T10:00", "2026-13-01T10:00", "2026-01-01T24:00", "2026-01-01T10:60"]) {
+      expect(pngLocalToIso(invalid), invalid).toBeNull();
+    }
+    expect(pngLocalToIso("2024-02-29T23:59")).not.toBeNull();
   });
   it("describes age", () => {
     const now = new Date("2026-11-04T10:00:00Z");
@@ -65,9 +69,12 @@ describe("abuse helpers", () => {
     t = 1500; expect(rl.allow("a")).toBe(true);
   });
   it("accepts only same-origin posts", () => {
-    expect(isSameOrigin(new Headers({ origin: "https://alert.test" }), "alert.test")).toBe(true);
-    expect(isSameOrigin(new Headers({ origin: "https://evil.test" }), "alert.test")).toBe(false);
-    expect(isSameOrigin(new Headers(), "alert.test")).toBe(false);
+    expect(isSameOrigin(new Headers({ origin: "https://alert.test" }), "https://alert.test")).toBe(true);
+    expect(isSameOrigin(new Headers({ origin: "https://evil.test" }), "https://alert.test")).toBe(false);
+    expect(isSameOrigin(new Headers({ origin: "http://alert.test" }), "https://alert.test")).toBe(false);
+    expect(isSameOrigin(new Headers({ origin: "https://alert.test:444" }), "https://alert.test")).toBe(false);
+    expect(isSameOrigin(new Headers({ referer: "https://alert.test/page" }), "https://alert.test")).toBe(true);
+    expect(isSameOrigin(new Headers(), "https://alert.test")).toBe(false);
   });
 });
 
@@ -86,6 +93,12 @@ describe("validation", () => {
     const base = { platform: "facebook", url: "https://facebook.com/x/posts/1", context: "Page post about road works", province: "Western Highlands", locality: "Hagen" };
     expect(sourceSchema.safeParse(base).success).toBe(true);
     expect(sourceSchema.safeParse({ ...base, url: "javascript:alert(1)" }).success).toBe(false);
+  });
+  it("rejects contact details in moderator-authored public titles and summaries", () => {
+    const id = "6f1c1b0e-9c7b-4a43-8f55-0a3f6d3a2f10";
+    expect(moderationSchema.safeParse({ target: "incident", id, action: "approve", title: "Call 71234567 for details" }).success).toBe(false);
+    expect(moderationSchema.safeParse({ target: "source_item", id, action: "approve", summary: "Email help@example.org for updates" }).success).toBe(false);
+    expect(moderationSchema.safeParse({ target: "incident", id, action: "approve", title: "Road closed near Kagamuga" }).success).toBe(true);
   });
   it("rejects unknown moderation actions for the target type", () => {
     const id = "6f1c1b0e-9c7b-4a43-8f55-0a3f6d3a2f10";

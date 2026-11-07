@@ -17,7 +17,12 @@ export default async function Moderation({ searchParams }: { searchParams: Promi
   const viewer = await currentViewer();
   if (!viewer) return <><h1>Moderation</h1><p><Link href="/login?next=/moderation">Log in</Link> with a moderator account.</p></>;
   if (!isModerator(viewer)) return <><h1>Moderation</h1><p className="flash error">This page is for moderators.</p></>;
-  const d = await moderationData();
+  let d: Awaited<ReturnType<typeof moderationData>>;
+  try {
+    d = await moderationData();
+  } catch {
+    return <><h1>Moderation</h1><p className="flash error" role="alert">Moderation data is temporarily unavailable. No queue status can be shown until the database connection is restored.</p></>;
+  }
 
   return (
     <>
