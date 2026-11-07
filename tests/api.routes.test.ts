@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.example.test");
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "test-anon-key");
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-key");
+  vi.stubEnv("ALLOW_ANONYMOUS_REPORTS", "false");
   state.anonymous = false; state.viewer = null; state.rpc = []; state.signedIn = 0;
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -133,6 +134,7 @@ describe("authentication and authorisation", () => {
     }
     expect(state.rpc).toHaveLength(0);
     state.anonymous = true;
+    vi.stubEnv("ALLOW_ANONYMOUS_REPORTS", "true");
     await reports(post("/api/reports", report));
     expect(state.rpc[0]).toMatchObject({ fn: "submit_incident", args: { p_user: null } });
   });
