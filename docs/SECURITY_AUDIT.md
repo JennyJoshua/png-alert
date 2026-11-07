@@ -12,17 +12,21 @@ Scope: every `app/api/**/route.ts`. Method: code review plus tests that call eac
 | `POST /api/moderation` | yes | none (privileged) | login required | moderator or admin; database re-checks the actor's role | zod `moderationSchema` with per-target action allow-list |
 | `POST /api/admin/sources` | yes | none (privileged) | login required | admin only; database `assert_admin`; saved as manual and disabled | zod `registrySchema` |
 
-All routes export POST only (other methods return 405). Database per-account limits apply in addition (reports 10/h, links 10/h, votes 30/h).
+All routes export POST only (other methods return 405). Database per-account limits apply in addition (reports 10/h, links 10/h, votes 30/h). Reader flags now have database-enforced limits: 10 per account per hour and 60 anonymous flags globally per hour. The anonymous bucket is serialized in Postgres; no IP address is stored.
 
 ## Omission found and fixed
 Every route called `req.formData()` directly, so a malformed, wrongly typed or very large body caused an unhandled error or an unbounded read. All routes now use `readForm` (`lib/http.ts`): form content types only, 64 KB cap enforced while streaming, `400` otherwise. Two mutation checks confirmed the tests fail if a route goes back to a bare `formData()` or loses its guard.
 
 ## Reviewed and deliberately unchanged
-- Anonymous flagging stays open so readers can report harmful content without an account. It is rate limited and only stores a text reason against a published item. Owner may choose to require login instead.
+- Anonymous flagging remains open. The database caps it at 60 submissions globally per hour; authenticated accounts are capped at 10 per hour. The global cap is a deliberately conservative pilot policy, not an IP-level identity system. The route's in-memory limiter remains supplementary only.
 - Moderation and admin routes have no IP limiter. They are role-gated, and every action is audit-logged in the database.
 - Unauthenticated callers get a login redirect from `/api/moderation` but a 403 from `/api/admin/sources` (cosmetic).
-- The origin check compares `Origin` with `X-Forwarded-Host` or `Host`. Deploy behind a platform that sets or overwrites `X-Forwarded-Host`. A browser cannot set that header cross-site, so this does not enable CSRF.
+- The origin check and redirects use `PNG_ALERT_PUBLIC_ORIGIN`, never `Host`, `X-Forwarded-Host` or `X-Forwarded-Proto`. Origin comparison includes scheme, hostname and port. Production mutation routes fail closed with 503 until the owner configures the canonical HTTPS origin. The value must be the actual public origin; preview domains must not be treated as production.
 - The IP limiter is per instance and in memory (pilot limitation, see `ARCHITECTURE.md`).
+
+## Moderator-authored text
+- Moderator-provided public incident titles/summaries and source titles/summaries are checked for phone numbers and email addresses at the route boundary.
+- Migration `0002_security_hardening.sql` adds NOT VALID database check constraints, enforcing the same rule for new/updated public text without blocking deployment on legacy rows. It must be reviewed and applied only through the separately approved migration process.
 
 ## Service-role key
 - `SUPABASE_SERVICE_ROLE_KEY` is read only in `lib/env.ts`, which imports `server-only` (a client import fails the build). `serviceClient` is used only by `lib/auth.ts`, `lib/repo.ts` and `app/api/**`.
