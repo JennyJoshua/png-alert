@@ -34,24 +34,20 @@ returns void
 language plpgsql
 security definer
 set search_path = public
-as $$
-declare
-  recent_count bigint;
+as $
 begin
   -- Serialize each bucket while counting and inserting so concurrent requests cannot
   -- race past the limit. Anonymous flags share a global bucket; no IP is persisted.
   if p_user is null then
     perform pg_advisory_xact_lock(hashtext('png-alert:anonymous-flags'));
-    select count(*) into recent_count
-      from content_flags
-      where flagged_by is null and created_at > now() - interval '1 hour';
-    if recent_count >= 60 then raise exception 'rate_limited'; end if;
+    if (select count(*) from content_flags
+        where flagged_by is null and created_at > now() - interval '1 hour') >= 60
+    then raise exception 'rate_limited'; end if;
   else
     perform pg_advisory_xact_lock(hashtext('png-alert:account-flags'), hashtext(p_user::text));
-    select count(*) into recent_count
-      from content_flags
-      where flagged_by = p_user and created_at > now() - interval '1 hour';
-    if recent_count >= 10 then raise exception 'rate_limited'; end if;
+    if (select count(*) from content_flags
+        where flagged_by = p_user and created_at > now() - interval '1 hour') >= 10
+    then raise exception 'rate_limited'; end if;
   end if;
 
   if p_type = 'incident' and not exists (
@@ -63,5 +59,4 @@ begin
 
   insert into content_flags (target_type, target_id, reason, flagged_by)
   values (p_type, p_target, p_reason, p_user);
-end;
-$$;
+end $;
