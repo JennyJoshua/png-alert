@@ -9,7 +9,7 @@ immutable
 parallel safe
 set search_path = public
 as $$
-  select coalesce(p_text, '') ~* '[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+'
+  select coalesce(p_text, '') ~* '[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+'
       or coalesce(p_text, '') ~ '(^|[^0-9])([+]?[0-9][[:space:]().-]?){8,}([^0-9]|$)';
 $$;
 
