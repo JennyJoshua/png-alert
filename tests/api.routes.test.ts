@@ -6,7 +6,11 @@ const state = vi.hoisted(() => ({
   configured: true, anonymous: false, viewer: null as null | { id: string; role: string },
   rpc: [] as { fn: string; args: any }[], signedIn: 0,
 }));
-vi.mock("@/lib/env", () => ({ isConfigured: () => state.configured, serverEnv: () => ({ allowAnonymousReports: state.anonymous }) }));
+vi.mock("@/lib/env", () => ({
+  isConfigured: () => state.configured,
+  serverEnv: () => ({ allowAnonymousReports: state.anonymous }),
+  canonicalPublicOrigin: (requestOrigin?: string) => requestOrigin ?? null,
+}));
 vi.mock("@/lib/auth", () => ({
   currentViewer: async () => state.viewer,
   isModerator: (v: any) => v?.role === "moderator" || v?.role === "admin",
