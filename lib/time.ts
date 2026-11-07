@@ -7,7 +7,7 @@ export function pngLocalToIso(value: string | undefined | null): string | null {
   if (!match) return null;
   const [, y, mo, d, h, mi] = match;
   const year = Number(y), month = Number(mo), day = Number(d), hour = Number(h), minute = Number(mi);
-  if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null;
+  if (year < 1 || month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null;
 
   // Validate the calendar components before applying the PNG UTC+10 offset.
   const calendar = new Date(0);
