@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 vi.mock("server-only", () => ({}));
-import { serverEnv, isConfigured } from "@/lib/env";
+import { serverEnv, isConfigured, canonicalPublicOrigin } from "@/lib/env";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -18,6 +18,18 @@ describe("environment defaults", () => {
     const text = readFileSync(".env.example", "utf8");
     expect(text).toMatch(/^ALLOW_ANONYMOUS_REPORTS=false$/m);
     expect(text).toMatch(/^SUPABASE_SERVICE_ROLE_KEY=$/m);
+  });
+  it("fails closed in production until a canonical origin is configured", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", "");
+    expect(canonicalPublicOrigin("https://request.example")).toBeNull();
+  });
+  it("rejects insecure or non-origin production configuration", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    for (const value of ["http://alerts.example.org", "https://alerts.example.org/path", "https://user@alerts.example.org"]) {
+      vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", value);
+      expect(canonicalPublicOrigin("https://request.example"), value).toBeNull();
+    }
   });
   it("reads the canonical public origin setting", () => {
     vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", "https://alerts.example.org");
