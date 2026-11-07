@@ -201,6 +201,43 @@ describe("database flag limits", () => {
   });
 });
 
+
+describe("concurrent anonymous flag quota", () => {
+  async function publishedIncident() {
+    const reporter = await newUser(db), mod = await newUser(db, "moderator");
+    const id = await submit(db, reporter);
+    await moderate(db, mod, id, "approve");
+    return id;
+  }
+
+  it("atomically admits at most 60 simultaneous anonymous submissions in the shared bucket", async () => {
+    const id = await publishedIncident();
+    const attempts = await Promise.allSettled(Array.from({ length: 65 }, (_, i) =>
+      db.query("select submit_flag(null, 'incident', $1, $2)", [id, "Concurrent anonymous flag " + i])
+    ));
+    const accepted = attempts.filter((result) => result.status === "fulfilled");
+    const rejected = attempts.filter((result) => result.status === "rejected");
+    expect(accepted).toHaveLength(60);
+    expect(rejected).toHaveLength(5);
+    expect(rejected.every((result) => result.status === "rejected" && /rate_limited/.test(String(result.reason)))).toBe(true);
+    const bucket = (await db.query<any>("select submission_count from flag_rate_limits where bucket_key = 'anonymous-global'")).rows[0];
+    expect(bucket.submission_count).toBe(60);
+  });
+
+  it("resets the shared anonymous bucket after its one-hour window expires", async () => {
+    const id = await publishedIncident();
+    for (let i = 0; i < 60; i++) {
+      await db.query("select submit_flag(null, 'incident', $1, $2)", [id, "Before reset flag " + i]);
+    }
+    await expect(db.query("select submit_flag(null, 'incident', $1, 'Before reset limit exceeded')", [id])).rejects.toThrow(/rate_limited/);
+    await db.query("update flag_rate_limits set window_started_at = now() - interval '61 minutes' where bucket_key = 'anonymous-global'");
+    await db.query("select submit_flag(null, 'incident', $1, 'First flag after reset')", [id]);
+    const bucket = (await db.query<any>("select submission_count, window_started_at > now() - interval '1 minute' as recently_reset from flag_rate_limits where bucket_key = 'anonymous-global'")).rows[0];
+    expect(bucket.submission_count).toBe(1);
+    expect(bucket.recently_reset).toBe(true);
+  });
+});
+
 describe("abuse controls", () => {
   it("rejects an identical resubmission by the same account and rate-limits bursts", async () => {
     const u = await newUser(db);
