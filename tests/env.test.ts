@@ -19,6 +19,10 @@ describe("environment defaults", () => {
     expect(text).toMatch(/^ALLOW_ANONYMOUS_REPORTS=false$/m);
     expect(text).toMatch(/^SUPABASE_SERVICE_ROLE_KEY=$/m);
   });
+  it("reads the canonical public origin setting", () => {
+    vi.stubEnv("PNG_ALERT_PUBLIC_ORIGIN", "https://alerts.example.org");
+    expect(serverEnv().publicOrigin).toBe("https://alerts.example.org");
+  });
   it("is not 'configured' until all three Supabase values exist", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://x.test"); vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "a");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
