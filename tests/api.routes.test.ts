@@ -77,6 +77,25 @@ describe.each(CASES)("$name: request hardening applies to every mutating route",
   });
 });
 
+describe("canonical origin trust", () => {
+  it("ignores spoofed forwarded host and protocol when checking and redirecting", async () => {
+    state.viewer = { id: "11111111-1111-4111-8111-111111111111", role: "reporter" };
+    const req = new NextRequest("http://app.test/api/reports", {
+      method: "POST",
+      headers: {
+        origin: "http://app.test",
+        "x-forwarded-host": "attacker.example",
+        "x-forwarded-proto": "https",
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(report).toString(),
+    });
+    const res = await reports(req);
+    expect(res.status).toBe(303);
+    expect(new URL(res.headers.get("location")!).origin).toBe("http://app.test");
+  });
+});
+
 describe("authentication and authorisation", () => {
   it("reporting and link sharing require an account unless anonymous mode is explicitly enabled", async () => {
     for (const [path, fields, fn] of [["/api/reports", report, reports], ["/api/sources", source, sources]] as const) {
