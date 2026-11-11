@@ -17,6 +17,7 @@ export async function freshDb() {
   const db = new PGlite();
   await db.exec(SHIM);
   await db.exec(readFileSync(join(process.cwd(), "supabase/migrations/0001_init.sql"), "utf8"));
+  await db.exec(readFileSync(join(process.cwd(), "supabase/migrations/0002_security_hardening.sql"), "utf8"));
   return db;
 }
 

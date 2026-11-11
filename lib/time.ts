@@ -3,9 +3,21 @@ import { PNG_TIME_ZONE } from "./constants";
 /** Form datetime-local values are entered in PNG time (UTC+10). Returns ISO UTC or null when invalid/empty. */
 export function pngLocalToIso(value: string | undefined | null): string | null {
   if (!value) return null;
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
-  const d = new Date(`${value}:00+10:00`);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, y, mo, d, h, mi] = match;
+  const year = Number(y), month = Number(mo), day = Number(d), hour = Number(h), minute = Number(mi);
+  if (year < 1 || month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null;
+
+  // Validate the calendar components before applying the PNG UTC+10 offset.
+  const calendar = new Date(0);
+  calendar.setUTCFullYear(year, month - 1, day);
+  calendar.setUTCHours(hour, minute, 0, 0);
+  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day || calendar.getUTCHours() !== hour ||
+      calendar.getUTCMinutes() !== minute) return null;
+
+  return new Date(calendar.getTime() - 10 * 60 * 60 * 1000).toISOString();
 }
 
 export function formatPngTime(iso: string | Date | null | undefined): string {

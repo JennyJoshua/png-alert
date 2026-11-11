@@ -66,6 +66,30 @@ describe("report -> moderation -> public feed", () => {
   });
 });
 
+describe("moderator-authored public text privacy", () => {
+  it("database constraints reject contact details in public incident and source text", async () => {
+    const reporter = await newUser(db);
+    const incident = await submit(db, reporter);
+    await expect(as(db, "service_role", () => db.query(
+      "update incidents set public_title = 'Call 71234567 for help' where id = $1", [incident]
+    ))).rejects.toThrow(/incidents_public_title_no_contact/);
+    await expect(as(db, "service_role", () => db.query(
+      "update incidents set public_summary = 'Email help@example.org for details' where id = $1", [incident]
+    ))).rejects.toThrow(/incidents_public_summary_no_contact/);
+
+    const source = (await as(db, "service_role", () => db.query<any>(
+      "select submit_source_item($1,'facebook','https://facebook.com/example/1','https://facebook.com/example/1','A source context with enough words','Western Highlands',null,'Mount Hagen',null,'{}')",
+      [reporter]
+    ))).rows[0].submit_source_item;
+    await expect(as(db, "service_role", () => db.query(
+      "update source_items set title = 'Call 71234567 now' where id = $1", [source]
+    ))).rejects.toThrow(/source_items_title_no_contact/);
+    await expect(as(db, "service_role", () => db.query(
+      "update source_items set summary = 'Email help@example.org for details' where id = $1", [source]
+    ))).rejects.toThrow(/source_items_summary_no_contact/);
+  });
+});
+
 describe("confirmation, staleness and trust labels", () => {
   async function published() {
     const reporter = await newUser(db), mod = await newUser(db, "moderator");
@@ -147,6 +171,70 @@ describe("content flags", () => {
     await as(db, "service_role", () => db.query("select resolve_flag($1,$2)", [mod, flag]));
     expect((await db.query<any>("select resolved from content_flags")).rows[0].resolved).toBe(true);
     expect((await db.query<any>("select action from moderation_actions where action='resolve_flag'")).rows).toHaveLength(1);
+  });
+});
+
+describe("database flag limits", () => {
+  it("bounds anonymous flags globally and authenticated flags per account", async () => {
+    const reporter = await newUser(db), mod = await newUser(db, "moderator");
+    const id = await submit(db, reporter);
+    await moderate(db, mod, id, "approve");
+
+    for (let i = 0; i < 60; i++) {
+      await as(db, "service_role", () => db.query(
+        "select submit_flag(null,'incident',$1,$2)", [id, `Anonymous concern number ${i}`]
+      ));
+    }
+    await expect(as(db, "service_role", () => db.query(
+      "select submit_flag(null,'incident',$1,'Anonymous limit exceeded')", [id]
+    ))).rejects.toThrow(/rate_limited/);
+
+    const account = await newUser(db);
+    for (let i = 0; i < 10; i++) {
+      await as(db, "service_role", () => db.query(
+        "select submit_flag($1,'incident',$2,$3)", [account, id, `Account concern number ${i}`]
+      ));
+    }
+    await expect(as(db, "service_role", () => db.query(
+      "select submit_flag($1,'incident',$2,'Account limit exceeded')", [account, id]
+    ))).rejects.toThrow(/rate_limited/);
+  });
+});
+
+
+describe("concurrent anonymous flag quota", () => {
+  async function publishedIncident() {
+    const reporter = await newUser(db), mod = await newUser(db, "moderator");
+    const id = await submit(db, reporter);
+    await moderate(db, mod, id, "approve");
+    return id;
+  }
+
+  it("atomically admits at most 60 simultaneous anonymous submissions in the shared bucket", async () => {
+    const id = await publishedIncident();
+    const attempts = await Promise.allSettled(Array.from({ length: 65 }, (_, i) =>
+      db.query("select submit_flag(null, 'incident', $1, $2)", [id, "Concurrent anonymous flag " + i])
+    ));
+    const accepted = attempts.filter((result) => result.status === "fulfilled");
+    const rejected = attempts.filter((result) => result.status === "rejected");
+    expect(accepted).toHaveLength(60);
+    expect(rejected).toHaveLength(5);
+    expect(rejected.every((result) => result.status === "rejected" && /rate_limited/.test(String(result.reason)))).toBe(true);
+    const bucket = (await db.query<any>("select submission_count from flag_rate_limits where bucket_key = 'anonymous-global'")).rows[0];
+    expect(bucket.submission_count).toBe(60);
+  });
+
+  it("resets the shared anonymous bucket after its one-hour window expires", async () => {
+    const id = await publishedIncident();
+    for (let i = 0; i < 60; i++) {
+      await db.query("select submit_flag(null, 'incident', $1, $2)", [id, "Before reset flag " + i]);
+    }
+    await expect(db.query("select submit_flag(null, 'incident', $1, 'Before reset limit exceeded')", [id])).rejects.toThrow(/rate_limited/);
+    await db.query("update flag_rate_limits set window_started_at = now() - interval '61 minutes' where bucket_key = 'anonymous-global'");
+    await db.query("select submit_flag(null, 'incident', $1, 'First flag after reset')", [id]);
+    const bucket = (await db.query<any>("select submission_count, window_started_at > now() - interval '1 minute' as recently_reset from flag_rate_limits where bucket_key = 'anonymous-global'")).rows[0];
+    expect(bucket.submission_count).toBe(1);
+    expect(bucket.recently_reset).toBe(true);
   });
 });
 
